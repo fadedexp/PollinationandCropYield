@@ -1,8 +1,16 @@
 import pandas as pd
+from sklearn import linear_model as lm
+from sklearn import ensemble
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import StandardScaler
+from sklearn.tree import DecisionTreeRegressor
 
 
 class Utils():
-    def get_final_data(self, df):
+    def __init__(self):
+        pass
+
+    def get_final_data(df):
         df['Row#'] = df['Row#'].replace({0 : 1})
         df['rain_intensity'] = df['AverageRainingDays'] / df['RainingDays']
         df['rain_variability'] = df['RainingDays'] / df['Row#']
@@ -47,3 +55,70 @@ class Utils():
 
         df = df.drop(columns=drop_cols)
         return df
+    
+    def get_final_model():
+        seed = 42
+        huber_params = {'epsilon': 1.4743037384391837,
+                        'alpha': 0.0008997364985513577,
+                        'fit_intercept': True,
+                        'max_iter': 700,
+                        'tol': 4.7218933129122393e-05,
+                        'warm_start': False}
+        pipeline_huber = Pipeline([
+            ('Scaler', StandardScaler()),
+            ('Model', lm.HuberRegressor(**huber_params))
+        ])
+        ridge_params = {'alpha': 0.00856065072895555, 'fit_intercept': True, 'solver': 'auto'}
+        pipeline_ridge = Pipeline([
+            ('Scaler', StandardScaler()),
+            ('Model', lm.Ridge(**ridge_params))
+        ])
+        rf_params1 = {'n_estimators': 268,
+        'max_depth': 7,
+        'min_samples_split': 13,
+        'min_samples_leaf': 10,
+        'max_features': None,
+        'max_samples': 0.5818250461230656,
+        'min_impurity_decrease': 0.055,
+        'min_weight_fraction_leaf': 0.0007226235667981045}
+        pipeline_rf = Pipeline([
+            ('Model', ensemble.RandomForestRegressor(**rf_params1, random_state=seed))
+        ])
+        pipeline_linear = Pipeline([
+            ('Scaler', StandardScaler()),
+            ('Model', lm.LinearRegression())
+        ])
+        elast_params = {'alpha': 5.699892707713835e-05,
+        'l1_ratio': 0.9982856945861646,
+        'max_iter': 5000,
+        'tol': 2.5429621690102518e-05,
+        'selection': 'random'}
+        pipeline_elast = Pipeline([
+            ('Scaler', StandardScaler()),
+            ('Model', lm.ElasticNet(**elast_params))
+        ])
+        bagging_params = {'n_estimators': 156,
+        'max_samples': 0.659621128654313,
+        'max_features': 0.5846355752413999,
+        'bootstrap': True,
+        'bootstrap_features': True}
+        pipeline_bagging = Pipeline([
+            ('Model', ensemble.BaggingRegressor(**bagging_params, estimator=DecisionTreeRegressor(max_depth=7), random_state=seed))
+        ])
+
+        estimators = [
+            ('rf', pipeline_rf),
+            ('huber', pipeline_huber),
+            ('ridge', pipeline_ridge),
+            ('linear', pipeline_linear),
+            ('bagging', pipeline_bagging),
+            ('elast', pipeline_elast)
+        ]
+        stacking = ensemble.StackingRegressor(
+            estimators=estimators,
+            final_estimator=pipeline_rf,
+            cv=5,
+            n_jobs=-1,
+            passthrough=True
+        )
+        return stacking
